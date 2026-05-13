@@ -9,8 +9,8 @@
 ## 当前状态
 
 - **当前里程碑**：M1 · 单片段折叠（PaperFragment）
-- **正在做**：M1-a · 节点骨架 + Prefab（可在编辑器里拖出一张静态纸片）
-- **下一步**：M1-b · 用代码控制纸片绕 Y 轴翻 180°（先固定动画，不接手指）
+- **最近完成**：M1-a · 节点骨架 + Prefab，编辑器内可见一张静态纸片
+- **下一步**：M1-b · 用代码控制纸片绕 Y 轴翻 180°（固定动画，不接手指、不加缓动）
 
 ---
 
@@ -24,7 +24,7 @@
 
 ### M1 · 单片段折叠 [WIP]
 
-- [WIP] M1-a 节点骨架 + Prefab，编辑器内可见一张静态纸片
+- [DONE 2026-05-13] M1-a 节点骨架 + Prefab，编辑器内可见一张静态纸片
 - [ ] M1-b 代码控制纸片绕 Y 轴翻 180°（固定动画）
 - [ ] M1-c 加 `tween` 缓动，引用 `Duration.fold` 与 `ease-fold`
 - [ ] M1-d `update` 内 Z 切换（过 90° 翻面），遵守「禁分配」纪律
@@ -74,21 +74,20 @@
 
 ## 当前会话上下文摘要（给下一次新会话）
 
-项目刚完成 PRD 与架构沉淀阶段，产出物：
+项目处于 **M1 实施期**，最新已通过节点：
 
-1. `.cursorrules`：工程宪法。
-2. `specs/ui-design.md`：完整 Design Tokens 体系（v0.1）。
-3. `specs/game-logic.md`：玩法规范（v0.1，今日新增）。
-4. `specs/system-arch.md`：架构规范（v0.1，今日新增，已含跨平台 §6）。
-5. `AGENTS.md` + `specs/PROGRESS.md`：AI 协作机制（今日新增）。
+- **M0**：`FoldController.ts` 触摸链路调试版。
+- **M1-a**：`PaperFragment.ts` 骨架 + `assets/prefabs/FragmentRoot.prefab`。节点结构 `FragmentRoot → Pivot → (FrontSprite, BackSprite)`，三个 `@property` 已绑定。临时贴图用 `assets/resources/textures/布料.png`。
 
-用户已认可：
-- Paper Fold 类玩法 + 治愈叙事（区别于 Voodoo 原版）；
-- 继续 Cocos 3.8，跨平台投放；
-- 边做边学，每个里程碑拆 4–6 个子步骤。
+下一步 **M1-b**：往 `PaperFragment` 加 `setFoldAngle(degY: number): void` 方法，并在 `start()` 里直接调用 `setFoldAngle(180)`（**临时调试入口**，M1-c 起会改用 `tween` + 外部驱动，最终接入 `FoldController` 的手指事件）。
+M1-b 操作时需要：在主场景把 `FragmentRoot` 实例从 Assets 拖到 `Canvas` 下，给 `BackSprite` 加临时染色（推荐 `clay-500 #D9A38B`）以肉眼区分翻面。
 
-代码层面只完成了 M0（`FoldController.ts` 调试版打通触摸事件链路）。
-下一步从 M1-a 开始：在 `assets/scripts/core/` 下创建 `PaperFragment.ts` 骨架，并在编辑器里做出一个可拖入的 Prefab，能看到一张静态纸片。
+协作纪律提醒：
+- 用户在边做边学 Cocos 3.8，每步必须「概念 → 代码 → 编辑器操作 → 验证」四段式；
+- 推进结束必更新本文件；
+- 每个里程碑验证通过后再 commit，commit history 与里程碑 1:1 对齐；
+- 新增事件先注册到 `GameEvents`；
+- 不主动创建 `.meta` / 不动 `temp/library/profiles/settings/`。
 
 ---
 
