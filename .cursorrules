@@ -1,0 +1,100 @@
+# Healing Origami 项目开发守则
+
+> 项目身份：Cocos Creator 3.8.8 + TypeScript 微信小游戏，治愈手作风折纸消除（Healing Origami）。
+> 所有 AI 协作必须遵循以下约束，违反需在 PR 描述中显式说明原因。
+
+---
+
+## 一、技术栈与版本
+
+- 引擎：Cocos Creator **3.8.8**（不要使用 2.x API）
+- 语言：TypeScript（严格风格，即使 `tsconfig` 暂未开 `strict`，代码也按 strict 写）
+- 目标平台：微信小游戏（主）/ H5 / Web 预览（次）
+- 包管理：使用项目自带 `package.json`，不引入需 Node 运行时的依赖到运行时代码
+
+---
+
+## 二、TypeScript 风格
+
+- 禁止使用 `any`；不得已时用 `unknown` 并显式收窄
+- 函数必须显式标注返回类型（包括 `void`）
+- 优先 `readonly` / `const` / `as const`；状态对象用接口而非匿名类型
+- 模块导入只用 ES Module 语法，禁止 `require`
+- 文件名与默认导出类同名（PascalCase.ts），一文件一职责
+- 变量 / 函数 camelCase；类 / 接口 / 类型 PascalCase；常量 SCREAMING_SNAKE_CASE
+- 接口名不加 `I` 前缀；类型别名能合并就合并，不重复定义
+
+---
+
+## 三、Cocos Creator 规范
+
+- 组件类必须使用装饰器：`@ccclass('XxxName')` + `@property(Type)`
+- 生命周期顺序固定：`onLoad → start → update → lateUpdate → onDestroy`，每个生命周期只做该阶段的事
+- **禁止在 `update` 内 `instantiate` / `new Vec3()` / 数组 push 等高频分配**；预创建并复用
+- 节点引用通过 `@property(Node)` / `@property(Prefab)` 注入，不在脚本里写死路径
+- 资源加载优先 `resources.load` + 类型标注，加载结果必须 `null` 检查
+- 事件监听必须 `target` 传 `this` 并在 `onDestroy` 中对应解绑
+- 销毁节点用 `node.destroy()`，不要直接置 `null`
+
+---
+
+## 四、架构约束
+
+### 单例与管理器
+- 非节点型管理器（数据、平台、事件）必须继承 `assets/scripts/utils/Singleton.ts`
+- 需要生命周期 / `update` / 节点引用的管理器必须继承 `assets/scripts/utils/ComponentSingleton.ts`
+- 不允许在业务代码中手写「自管理的静态实例」绕过基类
+
+### 跨模块通信
+- 跨模块通信必须经 `EventManager.instance.emit(...)`，禁止业务模块互相 import
+- 事件名必须取自 `assets/scripts/utils/EventManager.ts` 中的 `GameEvents` 常量，禁止裸字符串
+- 新增事件先在 `GameEvents` 注册并写明 payload 类型
+
+### 平台适配
+- 任何 `wx.*` 调用必须经过 `assets/scripts/platform/WXSDK.ts` 封装
+- 业务层只看到 `Promise` 与统一类型，不感知是否在微信环境
+- 新增微信能力先扩 `WXSDK`，再供业务调用
+
+### 目录约定
+- `assets/scripts/core` — 游戏核心逻辑（关卡、判定、状态机）
+- `assets/scripts/ui` — 视图层（仅展示与输入转发）
+- `assets/scripts/data` — 数据模型、存档、配置表
+- `assets/scripts/platform` — 平台适配（微信、H5）
+- `assets/scripts/utils` — 通用工具（单例、事件、对象池、数学辅助）
+
+---
+
+## 五、性能与资源
+
+- 纹理预压缩（ASTC / ETC2），界面图集化，单图不超 2048
+- 频繁创建销毁的对象（折纸碎片、粒子、音效播放器）必须走对象池
+- `AudioSource` 池化复用，禁止每次播放新建组件
+- 长列表 / 大量节点使用虚拟滚动或分帧实例化
+- 避免每帧 `getComponent` / `find`，缓存到字段
+
+---
+
+## 六、设计与 UI 同步
+
+- 所有 UI 颜色、字号、间距、圆角、阴影必须来自 [specs/ui-design.md](specs/ui-design.md) 的 Design Tokens
+- 后续派生 `assets/scripts/ui/DesignTokens.ts` 常量文件，UI 代码引用常量而非硬编码
+- 修改 Design Tokens 必须同步更新规范文档 + 常量文件，二者 1:1 对齐
+
+---
+
+## 七、注释与提交
+
+- 注释中文优先；只解释「为什么」与权衡，不解释「做什么」
+- 禁止 narrative 注释（如 `// 增加计数`、`// 返回结果`）
+- TODO 必须含上下文，例：`// TODO(@me): 等微信新版云开发 API 支持流式上传后替换`
+- 公共 API（导出函数 / 类）补 TSDoc，标注参数与返回值含义、副作用
+- 提交信息：`type(scope): 描述`，type ∈ feat/fix/refactor/perf/docs/chore/test
+
+---
+
+## 八、AI 协作专属
+
+- 生成代码前先读取相关现有文件，避免重复定义
+- 不主动创建 `.meta` 文件，交给 Cocos Creator 编辑器生成
+- 不修改 `temp/`、`library/`、`profiles/`、`settings/` 等自动生成目录
+- 不擅自升级引擎或依赖大版本，需先与维护者确认

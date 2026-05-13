@@ -1,0 +1,20 @@
+{
+  "name": "healing-origami",
+  "uuid": "429b05ae-b033-42a8-9b4c-22bad1cbe7c0",
+  "creator": {
+    "version": "3.8.8"
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "typescript": "^6.0.3"
+  }
+}
