@@ -126,6 +126,11 @@ export const GameEvents = {
     PIECE_PICKED: 'piece.picked',
     /** payload: { pieceId: string } */
     PIECE_FOLDED: 'piece.folded',
+    /**
+     * 折纸滑动手势进行中（每帧/每次 TOUCH_MOVE 派发）。
+     * payload: FoldingPayload —— 见 assets/scripts/core/FoldController.ts
+     */
+    GAME_EVENT_FOLDING: 'game.folding',
 
     // ---------- 经济与道具 ----------
     /** payload: { type: 'coin' | 'star'; delta: number; total: number } */
