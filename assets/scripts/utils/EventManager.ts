@@ -1,5 +1,3 @@
-import { Singleton } from './Singleton';
-
 /** 事件回调函数签名，payload 类型由调用方在 `on`/`emit` 时显式给出。 */
 export type EventHandler<P = unknown> = (payload: P) => void;
 
@@ -20,13 +18,24 @@ interface HandlerEntry {
  * - `once` 在触发后自动从集合中移除。
  * - `emit` 期间用快照遍历，避免回调中 `off` 引发迭代异常。
  * - 事件名只允许取自 `GameEvents` 常量，不接受裸字符串（编译期无法强制，靠代码评审保证）。
+ *
+ * 注：不继承 Singleton 基类，因为 Cocos 3.8 TypeScript 对泛型单例的 `this` 参数约束
+ *    与 `protected constructor` 存在类型冲突。此处手写单例更干净。
  */
-export class EventManager extends Singleton<EventManager> {
+export class EventManager {
+
+    private static _instance: EventManager | null = null;
 
     private readonly _handlers: Map<string, Set<HandlerEntry>> = new Map();
 
-    protected constructor() {
-        super();
+    private constructor() {}
+
+    /** 获取唯一实例。 */
+    public static getInstance(): EventManager {
+        if (!EventManager._instance) {
+            EventManager._instance = new EventManager();
+        }
+        return EventManager._instance;
     }
 
     /** 订阅事件。同一 `cb + target` 组合不会重复注册。 */

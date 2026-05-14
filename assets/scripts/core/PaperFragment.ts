@@ -2,6 +2,7 @@ import { _decorator, Component, Node, Rect, Sprite, SpriteFrame, Texture2D, twee
 
 import { FragmentConfig } from '../data/FragmentConfig';
 import { DURATION_FOLD_SEC, easeFold } from '../utils/MotionEasing';
+import { EventManager, GameEvents } from '../utils/EventManager';
 
 const { ccclass, property } = _decorator;
 
@@ -21,9 +22,10 @@ const { ccclass, property } = _decorator;
  *       └── BackSprite    ← 背面图案，eulerAngles = (0, 180, 0) 与正面背靠背
  * ```
  *
- * 当前实现阶段：**M1-d 完成**，下一步 M1-e（UV）
- *  - M1-a～c：节点骨架、`setFoldAngle`、`tweenFoldTo` + `MotionEasing`；
- *  - M1-d：`update` 内 `|eulerAngles.y|` 过 90° 切换 Pivot 下 Front/Back sibling；`onLoad` 缓存节点引用。
+ * 当前实现阶段：**M1-f 完成**（`init` / `commitFold` / `revertFold` / `isFolded` 全部对外 API 可用）。
+ *  - M1-a～d：节点骨架、角度驱动、tween、sibling 切换；
+ *  - M1-e：`FragmentConfig` 接口 + `init()` 注入 SpriteFrame；
+ *  - M1-f：`commitFold` / `revertFold` Promise API + 折叠事件派发。
  *
  * 关键纪律（呼应 `.cursorrules`）：
  *  - 折叠以 tween 作用于 `pivot.eulerAngles`，**严禁**直接旋转本节点；
@@ -104,6 +106,9 @@ export class PaperFragment extends Component {
     /** 片段数据配置，由 LevelLoader 通过 init() 注入。 */
     private _config: FragmentConfig | null = null;
 
+    /** 当前折叠角度（°），0 = 完全展开，180 = 完全折叠。 */
+    private _foldAngle = 0;
+
     // -------------------------------------------------------------------------
     // 生命周期
     // -------------------------------------------------------------------------
@@ -182,11 +187,16 @@ export class PaperFragment extends Component {
     }
 
     protected start(): void {
-        if (!this.debugAutoTweenFold180 || !this.pivot) {
+        if (!this.debugAutoTweenFold180) {
             return;
         }
+        // 验证 M1-f 新 API：折叠 → 停留 1.5 s → 回弹
         this.setFoldAngle(0);
-        this.tweenFoldTo(180, DURATION_FOLD_SEC);
+        void this.commitFold().then(() => {
+            setTimeout(() => {
+                void this.revertFold('release');
+            }, 1500);
+        });
     }
 
     protected onDestroy(): void {
@@ -212,7 +222,22 @@ export class PaperFragment extends Component {
         Tween.stopAllByTarget(this.pivot);
         this._tmpEuler.set(0, degY, 0);
         this.pivot.eulerAngles = this._tmpEuler;
+        this._foldAngle = degY;
         this._syncSiblingOrder(Math.abs(degY));
+        this._emitProgress(degY);
+    }
+
+    /**
+     * 派发折叠进度事件。
+     *
+     * 每次 `setFoldAngle` 调用或 `commitFold` / `revertFold` 发起时触发，
+     * 供 FoldController 派发振动、UI 派发辅助线等。
+     */
+    private _emitProgress(angleDeg: number): void {
+        EventManager.getInstance().emit(GameEvents.FRAGMENT_FOLD_PROGRESS, {
+            fragmentId: this._config?.id ?? '',
+            angleDeg,
+        });
     }
 
     /**
@@ -230,6 +255,70 @@ export class PaperFragment extends Component {
         tween(this.pivot)
             .to(durationSec, { eulerAngles: end }, { easing: easeFold })
             .start();
+    }
+
+    /**
+     * 将片段折叠到 180° 并提交。
+     *
+     * 以 `duration-fold` + `ease-fold` 驱动 pivot 旋转到 180°，
+     * 完成后派发 `FRAGMENT_FOLD_COMMIT` 事件供 WinChecker 等模块消费。
+     *
+     * @returns Promise，折叠动画完成时 resolve。
+     */
+    public commitFold(): Promise<void> {
+        if (!this.pivot) return Promise.resolve();
+
+        this._foldAngle = 180;
+        this._emitProgress(this._foldAngle);
+
+        return new Promise<void>((resolve) => {
+            Tween.stopAllByTarget(this.pivot);
+            tween(this.pivot)
+                .to(DURATION_FOLD_SEC, { eulerAngles: v3(0, 180, 0) }, { easing: easeFold })
+                .call(() => {
+                    this._syncSiblingOrder(180);
+                    EventManager.getInstance().emit(GameEvents.FRAGMENT_FOLD_COMMIT, {
+                        fragmentId: this._config?.id ?? '',
+                    });
+                    resolve();
+                })
+                .start();
+        });
+    }
+
+    /**
+     * 将片段回弹到 0°（展开状态）。
+     *
+     * 以 60% `duration-fold` 驱动 pivot 回到 0°，
+     * 完成后派发 `FRAGMENT_FOLD_REVERT` 事件。
+     *
+     * @param reason 回弹原因，用于区分「玩家松手释放」和「顺序冲突」。
+     * @returns Promise，回弹动画完成时 resolve。
+     */
+    public revertFold(reason: 'release' | 'order-conflict' = 'release'): Promise<void> {
+        if (!this.pivot) return Promise.resolve();
+
+        this._foldAngle = 0;
+
+        return new Promise<void>((resolve) => {
+            Tween.stopAllByTarget(this.pivot);
+            tween(this.pivot)
+                .to(DURATION_FOLD_SEC * 0.6, { eulerAngles: v3(0, 0, 0) }, { easing: easeFold })
+                .call(() => {
+                    this._syncSiblingOrder(0);
+                    EventManager.getInstance().emit(GameEvents.FRAGMENT_FOLD_REVERT, {
+                        fragmentId: this._config?.id ?? '',
+                        reason,
+                    });
+                    resolve();
+                })
+                .start();
+        });
+    }
+
+    /** 查询当前片段是否已折叠到 180°。 */
+    public isFolded(): boolean {
+        return this._foldAngle >= 180;
     }
 
     // -------------------------------------------------------------------------

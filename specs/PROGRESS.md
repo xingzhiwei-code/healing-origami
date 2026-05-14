@@ -8,9 +8,9 @@
 
 ## 当前状态
 
-- **当前里程碑**：M1 · 单片段折叠（PaperFragment）
-- **正在做**：M1-f · `init` / `commitFold` / `revertFold` 等完整对外 API
-- **下一步**：M2 · 关卡数据 + 单关 hardcode 跑通
+- **当前里程碑**：M2 · 关卡数据 + 单关 hardcode 跑通
+- **正在做**：M2-a · LevelRegistry 写死章节 1 第 1 关数据
+- **下一步**：M2-b · LevelLoader 实例化片段 + 跑通单关
 
 ---
 
@@ -22,14 +22,14 @@
 
 - [DONE 2026-05-13] `FoldController.ts` 调试版打通触摸事件链路
 
-### M1 · 单片段折叠 [WIP]
+### M1 · 单片段折叠 [DONE 2026-05-14]
 
 - [DONE 2026-05-13] M1-a 节点骨架 + Prefab，编辑器内可见一张静态纸片
 - [DONE 2026-05-14] M1-b `setFoldAngle(degY)` 驱动 `pivot.eulerAngles.y`，`_tmpEuler` 复用；0°/90°/120° 预览与 Pivot 子树验证通过
 - [DONE 2026-05-14] M1-c：`tweenFoldTo` + `MotionEasing.ts`（`duration-fold` 600 ms + `ease-fold` bezier）；`debugAutoTweenFold180` 编辑器验收通过
 - [DONE 2026-05-14] M1-d `update` 内 sibling 切换（`|y|>90` Back 置顶，`|y|<90` Front 置顶）；越 90° tween 无错误遮挡；`onLoad` 缓存 `_pivotNode/_frontNode/_backNode`
 - [DONE 2026-05-14] M1-e 正反面双 Sprite + UV（`FragmentConfig` 接口 + `init()` 注入 SpriteFrame，编辑器验证通过）
-- [ ] M1-f `PaperFragment` 完整对外 API（`init` / `commitFold` / `revertFold` 等）
+- [DONE 2026-05-14] M1-f `PaperFragment` 完整对外 API（`init` / `commitFold` / `revertFold` / `isFolded` + 折叠事件派发）
 
 ### M2 · 关卡数据 + 单关跑通 [TODO]
 
@@ -52,6 +52,7 @@
 
 | 日期 | 决策 | 原因 |
 |---|---|---|
+| 2026-05-14 | M1-f：`commitFold` / `revertFold` 返回 `Promise`，tween 完成后 `.call()` 派发事件再 resolve；`EventManager` 改为手写单例避开 Cocos 3.8 TS 对 `Singleton<T>` 泛型 `this` 参数的类型冲突 | Promise 链式调用比 callback 更清晰；手写单例比改泛型约束更安全 |
 | 2026-05-14 | M1-e：`FragmentConfig` 独立到 `data/`，`init()` 三参数（config + frontSF + backFullSF），背面 UV 用 `SpriteFrame.rect` 直接裁剪 | `config` 与 UI 解耦；`backRect` 无需手动算镜像 UV，引擎级 rect 裁剪更可靠 |
 | 2026-05-14 | M1-d：以 pivot 绕本地 Y 的转角绝对值与 90° 开区间切换 Pivot 下子节点 `setSiblingIndex(last)`；不在 `update` 内 `getComponent` | 翻面后须让朝外一侧后绘，避免穿模；与子节点仅 Front/Back 的 Prefab 约定一致 |
 | 2026-05-14 | M1-c：`ease-fold` 用 CSS cubic-bezier 逆解映射到 Cocos `Tween` 的 `easing(k)`；时长/曲线暂放在 `MotionEasing.ts`，M5 与 `DesignTokens` 对齐 | 引擎内置字符串 easing 无该 bezier；避免与设计 Token 漂移 |
@@ -77,9 +78,9 @@
 
 ## 当前会话上下文摘要（给下一次新会话）
 
-- **M1-e 已合并**：`FragmentConfig` 接口定义 + `PaperFragment.init()` 注入 SpriteFrame；正反面 UV 编辑器验证通过。
-- **下一里程碑 M1-f**：补充 `commitFold` / `revertFold` 完整对外 API（含事件派发）。
-- **提醒**：`debugAutoTweenFold180` 默认关闭。
+- **M1-f 已合并**：`commitFold` / `revertFold` / `isFolded` 全部可用；编辑器验证折叠→停留→回弹流程正确。
+- **下一里程碑 M2**：LevelRegistry 写死章节 1 数据 → LevelLoader 实例化片段 → 单关跑通。
+- **提醒**：`debugAutoTweenFold180` 在接 `FoldController` 后应关闭。
 
 协作纪律提醒：推进结束必更新本文件；新增事件先注册 `GameEvents`；不主动创建 `.meta` / 不动 `temp/library/profiles/settings/`。
 
@@ -94,3 +95,4 @@
 - v0.5（2026-05-14）M1-d 实现落位（sibling 切换），待预览验收。
 - v0.6（2026-05-14）M1-d 验收通过，进入 M1-e。
 - v0.7（2026-05-14）M1-e 完成（FragmentConfig 接口 + init 注入 + 编辑器验证通过），进入 M1-f。
+- v0.8（2026-05-14）M1-f 完成（commitFold / revertFold / isFolded Promise API + 事件派发），M1 全部子任务完成，进入 M2。
