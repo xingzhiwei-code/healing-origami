@@ -132,6 +132,16 @@ export const GameEvents = {
      */
     GAME_EVENT_FOLDING: 'game.folding',
 
+    // ---------- 折叠会话（M1-e 新增） ----------
+    /** payload: { fragmentId: string } */
+    FRAGMENT_FOLD_BEGIN: 'fragment.fold.begin',
+    /** payload: { fragmentId: string; angleDeg: number } */
+    FRAGMENT_FOLD_PROGRESS: 'fragment.fold.progress',
+    /** payload: { fragmentId: string } */
+    FRAGMENT_FOLD_COMMIT: 'fragment.fold.commit',
+    /** payload: { fragmentId: string; reason: 'release' | 'order-conflict' } */
+    FRAGMENT_FOLD_REVERT: 'fragment.fold.revert',
+
     // ---------- 经济与道具 ----------
     /** payload: { type: 'coin' | 'star'; delta: number; total: number } */
     CURRENCY_CHANGED: 'currency.changed',

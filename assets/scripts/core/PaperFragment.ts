@@ -1,5 +1,6 @@
-import { _decorator, Component, Node, Sprite, tween, Tween, Vec3, v3 } from 'cc';
+import { _decorator, Component, Node, Rect, Sprite, SpriteFrame, Texture2D, tween, Tween, Vec3, v3 } from 'cc';
 
+import { FragmentConfig } from '../data/FragmentConfig';
 import { DURATION_FOLD_SEC, easeFold } from '../utils/MotionEasing';
 
 const { ccclass, property } = _decorator;
@@ -100,9 +101,50 @@ export class PaperFragment extends Component {
 
     private _backNode: Node | null = null;
 
+    /** 片段数据配置，由 LevelLoader 通过 init() 注入。 */
+    private _config: FragmentConfig | null = null;
+
     // -------------------------------------------------------------------------
     // 生命周期
     // -------------------------------------------------------------------------
+
+    /**
+     * 初始化片段数据与贴图。
+     *
+     * @param config 片段配置（多边形、pivot、折叠顺序等）。
+     * @param frontSF 正面预切 SpriteFrame（片段专属预切图）。
+     * @param backFullSF 背面完整图 SpriteFrame（用于镜像 UV 采样）。
+     *
+     * 本方法由 LevelLoader 在关卡加载阶段调用。
+     * M1-e 阶段仅做 SpriteFrame 注入与 UV 设置；M1-f 将补充完整 commitFold / revertFold。
+     */
+    public init(
+        config: FragmentConfig,
+        frontSF: SpriteFrame,
+        backFullSF: SpriteFrame,
+    ): void {
+        this._config = config;
+        this._applySpriteFrames(frontSF, backFullSF);
+    }
+
+    /**
+     * 将 SpriteFrame 挂到 Front/Back Sprite，并按 backRect 设置背面 UV。
+     */
+    private _applySpriteFrames(frontSF: SpriteFrame, backFullSF: SpriteFrame): void {
+        if (!this.frontSprite || !this.backSprite) return;
+
+        // 正面：直接用预切图
+        this.frontSprite.spriteFrame = frontSF;
+
+        // 背面：用完整图 + backRect 裁剪出需要显示的区域
+        const { backRect } = this._config!;
+        const backTrimSF = new SpriteFrame();
+        const tex = backFullSF.texture as Texture2D;
+        backTrimSF.texture = tex;
+        backTrimSF.rect = new Rect(backRect.x, backRect.y, backRect.w, backRect.h);
+
+        this.backSprite.spriteFrame = backTrimSF;
+    }
 
     /**
      * onLoad 阶段唯一职责：核对 Inspector 引用是否就位。
