@@ -9,8 +9,8 @@
 ## 当前状态
 
 - **当前里程碑**：M2 · 关卡数据 + 单关 hardcode 跑通
-- **正在做**：M2-a · LevelRegistry 写死章节 1 第 1 关数据
-- **下一步**：M2-b · LevelLoader 实例化片段 + 跑通单关
+- **正在做**：M2-b · 清理诊断日志 + 提交 M2 代码
+- **下一步**：M3 · FoldOrderResolver 多片段 Z 切换与穿模检测
 
 ---
 
@@ -31,7 +31,11 @@
 - [DONE 2026-05-14] M1-e 正反面双 Sprite + UV（`FragmentConfig` 接口 + `init()` 注入 SpriteFrame，编辑器验证通过）
 - [DONE 2026-05-14] M1-f `PaperFragment` 完整对外 API（`init` / `commitFold` / `revertFold` / `isFolded` + 折叠事件派发）
 
-### M2 · 关卡数据 + 单关跑通 [TODO]
+### M2 · 关卡数据 + 单关跑通 [DONE 2026-05-14]
+
+- [DONE 2026-05-14] M2-a `LevelRegistry` 单例，写死章节 1 第 1 关（左右对折，2 片段）
+- [DONE 2026-05-14] M2-b `LevelRunner` 关卡运行器：从 Registry 取配置 → 实例化 FragmentPrefab → `init()` 注入 SpriteFrame → 派发 LEVEL_START / LEVEL_COMPLETE
+- [DONE 2026-05-14] M2-c 编辑器验证：LevelTest 场景跑通，2 个片段正确加载并渲染
 
 ### M3 · FoldOrderResolver 多片段 Z 切换与穿模检测 [TODO]
 
@@ -52,6 +56,7 @@
 
 | 日期 | 决策 | 原因 |
 |---|---|---|
+| 2026-05-14 | M2：片段位置用 `polyPoints` 的 AABB 中心计算，而非 `pivotPos`；`LevelRegistry` / `EventManager` 改为手写单例避开 Cocos 3.8 TS 对 `Singleton<T>` 泛型 `this` 参数与 `protected constructor` 的类型冲突 | `pivotPos` 是折痕点不是片段中心，AABB 更准确；手写单例比改泛型约束更安全 |
 | 2026-05-14 | M1-f：`commitFold` / `revertFold` 返回 `Promise`，tween 完成后 `.call()` 派发事件再 resolve；`EventManager` 改为手写单例避开 Cocos 3.8 TS 对 `Singleton<T>` 泛型 `this` 参数的类型冲突 | Promise 链式调用比 callback 更清晰；手写单例比改泛型约束更安全 |
 | 2026-05-14 | M1-e：`FragmentConfig` 独立到 `data/`，`init()` 三参数（config + frontSF + backFullSF），背面 UV 用 `SpriteFrame.rect` 直接裁剪 | `config` 与 UI 解耦；`backRect` 无需手动算镜像 UV，引擎级 rect 裁剪更可靠 |
 | 2026-05-14 | M1-d：以 pivot 绕本地 Y 的转角绝对值与 90° 开区间切换 Pivot 下子节点 `setSiblingIndex(last)`；不在 `update` 内 `getComponent` | 翻面后须让朝外一侧后绘，避免穿模；与子节点仅 Front/Back 的 Prefab 约定一致 |
@@ -78,9 +83,8 @@
 
 ## 当前会话上下文摘要（给下一次新会话）
 
-- **M1-f 已合并**：`commitFold` / `revertFold` / `isFolded` 全部可用；编辑器验证折叠→停留→回弹流程正确。
-- **下一里程碑 M2**：LevelRegistry 写死章节 1 数据 → LevelLoader 实例化片段 → 单关跑通。
-- **提醒**：`debugAutoTweenFold180` 在接 `FoldController` 后应关闭。
+- **M2 已合并**：LevelRegistry 写死关卡数据 + LevelRunner 实例化片段跑通，2 片段正确渲染。设计分辨率修正为 720×1280。
+- **下一里程碑 M3**：FoldOrderResolver 多片段 Z 切换与穿模检测。
 
 协作纪律提醒：推进结束必更新本文件；新增事件先注册 `GameEvents`；不主动创建 `.meta` / 不动 `temp/library/profiles/settings/`。
 
@@ -96,3 +100,4 @@
 - v0.6（2026-05-14）M1-d 验收通过，进入 M1-e。
 - v0.7（2026-05-14）M1-e 完成（FragmentConfig 接口 + init 注入 + 编辑器验证通过），进入 M1-f。
 - v0.8（2026-05-14）M1-f 完成（commitFold / revertFold / isFolded Promise API + 事件派发），M1 全部子任务完成，进入 M2。
+- v0.9（2026-05-14）M2 完成（LevelRegistry + LevelRunner 单关跑通 + 设计分辨率修正），进入 M3。
