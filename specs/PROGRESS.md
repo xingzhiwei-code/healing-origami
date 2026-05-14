@@ -9,8 +9,8 @@
 ## 当前状态
 
 - **当前里程碑**：M1 · 单片段折叠（PaperFragment）
-- **正在做**：M1-d · `update` 内过 90° 的 Front/Back **sibling** 切换（禁分配）
-- **下一步**：M1-e · 正反面 UV / 贴图策略落地
+- **正在做**：M1-e · 正反面 UV / 贴图（Front 片段图 + Back 大图 rect / 镜像）
+- **下一步**：M1-f · `init` / `commitFold` / `revertFold` 等完整对外 API
 
 ---
 
@@ -27,7 +27,7 @@
 - [DONE 2026-05-13] M1-a 节点骨架 + Prefab，编辑器内可见一张静态纸片
 - [DONE 2026-05-14] M1-b `setFoldAngle(degY)` 驱动 `pivot.eulerAngles.y`，`_tmpEuler` 复用；0°/90°/120° 预览与 Pivot 子树验证通过
 - [DONE 2026-05-14] M1-c：`tweenFoldTo` + `MotionEasing.ts`（`duration-fold` 600 ms + `ease-fold` bezier）；`debugAutoTweenFold180` 编辑器验收通过
-- [WIP] M1-d `update` 内 Z 切换（过 90° 翻面），遵守「禁分配」纪律
+- [DONE 2026-05-14] M1-d `update` 内 sibling 切换（`|y|>90` Back 置顶，`|y|<90` Front 置顶）；越 90° tween 无错误遮挡；`onLoad` 缓存 `_pivotNode/_frontNode/_backNode`
 - [ ] M1-e 正反面双 Sprite + UV（FrontSprite 用片段图，BackSprite 用完整图镜像 UV）
 - [ ] M1-f `PaperFragment` 完整对外 API（`init` / `commitFold` / `revertFold` 等）
 
@@ -52,6 +52,7 @@
 
 | 日期 | 决策 | 原因 |
 |---|---|---|
+| 2026-05-14 | M1-d：以 pivot 绕本地 Y 的转角绝对值与 90° 开区间切换 Pivot 下子节点 `setSiblingIndex(last)`；不在 `update` 内 `getComponent` | 翻面后须让朝外一侧后绘，避免穿模；与子节点仅 Front/Back 的 Prefab 约定一致 |
 | 2026-05-14 | M1-c：`ease-fold` 用 CSS cubic-bezier 逆解映射到 Cocos `Tween` 的 `easing(k)`；时长/曲线暂放在 `MotionEasing.ts`，M5 与 `DesignTokens` 对齐 | 引擎内置字符串 easing 无该 bezier；避免与设计 Token 漂移 |
 | 2026-05-13 | 建立 `AGENTS.md` + `specs/PROGRESS.md` 双文档作为 AI 跨会话记忆机制 | 单上下文有限，需要项目自描述能力 |
 | 2026-05-13 | 主目标微信小游戏，次目标 iOS / Android Native + H5 | 用户希望跨平台 |
@@ -75,9 +76,9 @@
 
 ## 当前会话上下文摘要（给下一次新会话）
 
-- **M1-c 已合并**：用户预览确认 `tweenFoldTo` + `easeFold` + 600 ms 手感合格。
-- **下一里程碑 M1-d**：在 `PaperFragment.update` 里根据 `|pivot.eulerAngles.y|（或 x，视轴向约定）` 与 90° 的关系切换 `frontSprite.node` / `backSprite.node` 的 `setSiblingIndex`，使翻面后正确的一面在上；**禁止**在 `update` 里 `new Vec3` / `getComponent`。
-- **提醒**：`debugAutoTweenFold180` 默认识关；接 `FoldController` 前可偶尔打开做回归。
+- **M1-d 已合并**：用户预览确认 0→180° tween 过 90° 时 sibling 切换无错误遮挡。
+- **下一里程碑 M1-e**：为 `FrontSprite` / `BackSprite` 设置 `SpriteFrame` 的 rect（或与预切图策略一致）；背面展示「大图」上对应 UV，使折过去后图案连贯；顺带收敛 Q3。
+- **提醒**：`debugAutoTweenFold180` 默认关闭。
 
 协作纪律提醒：推进结束必更新本文件；新增事件先注册 `GameEvents`；不主动创建 `.meta` / 不动 `temp/library/profiles/settings/`。
 
@@ -89,3 +90,5 @@
 - v0.2（2026-05-14）同步 M1-b 完成与 M1-c 起点。
 - v0.3（2026-05-14）同步 M1-c 实现落位与验收步骤。
 - v0.4（2026-05-14）M1-c 验收通过，进入 M1-d。
+- v0.5（2026-05-14）M1-d 实现落位（sibling 切换），待预览验收。
+- v0.6（2026-05-14）M1-d 验收通过，进入 M1-e。

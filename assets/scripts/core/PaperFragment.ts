@@ -20,15 +20,14 @@ const { ccclass, property } = _decorator;
  *       └── BackSprite    ← 背面图案，eulerAngles = (0, 180, 0) 与正面背靠背
  * ```
  *
- * 当前实现阶段：**M1-c 进行中**
- *  - M1-a：结构与 @property 注入点；
- *  - M1-b：`setFoldAngle(degY)` 即时设置 `pivot.eulerAngles.y`；
- *  - M1-c：`tweenFoldTo` 使用 `duration-fold` + `ease-fold`；M1-d 起接 Z 切换；M2 接手势。
+ * 当前实现阶段：**M1-d 完成**，下一步 M1-e（UV）
+ *  - M1-a～c：节点骨架、`setFoldAngle`、`tweenFoldTo` + `MotionEasing`；
+ *  - M1-d：`update` 内 `|eulerAngles.y|` 过 90° 切换 Pivot 下 Front/Back sibling；`onLoad` 缓存节点引用。
  *
  * 关键纪律（呼应 `.cursorrules`）：
  *  - 折叠以 tween 作用于 `pivot.eulerAngles`，**严禁**直接旋转本节点；
  *  - `update` 内禁分配（避免 `new Vec3` / `instantiate` / `getComponent`）；
- *  - Inspector 引用全部在 `onLoad` 阶段一次性校验，运行期不再做 null 防御。
+ *  - Inspector 引用在 `onLoad` 缓存在 `_pivotNode` / `_frontNode` / `_backNode`，`update` 不再 `getComponent`；
  */
 @ccclass('PaperFragment')
 export class PaperFragment extends Component {
@@ -91,6 +90,16 @@ export class PaperFragment extends Component {
      */
     private readonly _tmpEuler: Vec3 = new Vec3();
 
+    /** Pivot 子树内「朝上渲染」的一侧是否为背面（`|y| > 90°` 时为 true）。 */
+    private _backOnTop = false;
+
+    /** 缓存在 `onLoad`，供 `update` 零 `getComponent`。 */
+    private _pivotNode: Node | null = null;
+
+    private _frontNode: Node | null = null;
+
+    private _backNode: Node | null = null;
+
     // -------------------------------------------------------------------------
     // 生命周期
     // -------------------------------------------------------------------------
@@ -112,6 +121,22 @@ export class PaperFragment extends Component {
         if (!this.backSprite) {
             console.warn(`${tag} 缺少 backSprite 引用，请把 BackSprite 节点（含 Sprite 组件）拖入`);
         }
+
+        this._cachePivotChildNodes();
+        this._initSiblingOrderFromPivotAngle();
+    }
+
+    protected update(_dt: number): void {
+        void _dt;
+        if (!this._pivotNode || !this._frontNode || !this._backNode) {
+            return;
+        }
+        if (!this._pivotNode.isValid || !this._frontNode.isValid || !this._backNode.isValid) {
+            return;
+        }
+        // 只读标量，避免在 `update` 里依赖临时 Vec3 分配习惯（各版本 `eulerAngles` getter 实现不一）。
+        const absY = Math.abs(this._pivotNode.eulerAngles.y);
+        this._syncSiblingOrder(absY);
     }
 
     protected start(): void {
@@ -145,6 +170,7 @@ export class PaperFragment extends Component {
         Tween.stopAllByTarget(this.pivot);
         this._tmpEuler.set(0, degY, 0);
         this.pivot.eulerAngles = this._tmpEuler;
+        this._syncSiblingOrder(Math.abs(degY));
     }
 
     /**
@@ -162,5 +188,60 @@ export class PaperFragment extends Component {
         tween(this.pivot)
             .to(durationSec, { eulerAngles: end }, { easing: easeFold })
             .start();
+    }
+
+    // -------------------------------------------------------------------------
+    // 渲染顺序（Pivot 子节点 sibling）
+    // -------------------------------------------------------------------------
+
+    /**
+     * 缓存 Pivot 以及其下正反节点引用；并校验父子关系（翻面逻辑依赖「二者为 Pivot 直系子节点」）。
+     */
+    private _cachePivotChildNodes(): void {
+        this._pivotNode = this.pivot;
+        this._frontNode = this.frontSprite?.node ?? null;
+        this._backNode = this.backSprite?.node ?? null;
+        if (!this._pivotNode || !this._frontNode || !this._backNode) {
+            return;
+        }
+        if (this._frontNode.parent !== this._pivotNode || this._backNode.parent !== this._pivotNode) {
+            console.warn(
+                `[PaperFragment "${this.node.name}"] FrontSprite / BackSprite 节点必须是 Pivot 的直接子节点，`
+                    + '否则 M1-d sibling 切换无效',
+            );
+        }
+    }
+
+    /**
+     * 与当前 Pivot 角度对齐 `_backOnTop` 并把正确的一侧置于子节点列表末尾（同层内通常后绘在上）。
+     */
+    private _initSiblingOrderFromPivotAngle(): void {
+        if (!this._pivotNode || !this._frontNode || !this._backNode) {
+            return;
+        }
+        const absY = Math.abs(this._pivotNode.eulerAngles.y);
+        this._backOnTop = absY > 90;
+        const topNode = this._backOnTop ? this._backNode : this._frontNode;
+        const lastIdx = this._pivotNode.children.length - 1;
+        topNode.setSiblingIndex(lastIdx);
+    }
+
+    /**
+     * 按折叠深度切换 sibling：`|y| > 90°` 时背面朝外需压过正面。
+     *
+     * 阈值取开区间以避免在恰好 90° 振荡；与 `specs/system-arch.md` §2.1 描述一致。
+     */
+    private _syncSiblingOrder(absDegY: number): void {
+        if (!this._pivotNode || !this._frontNode || !this._backNode) {
+            return;
+        }
+        const lastIdx = this._pivotNode.children.length - 1;
+        if (absDegY > 90 && !this._backOnTop) {
+            this._backNode.setSiblingIndex(lastIdx);
+            this._backOnTop = true;
+        } else if (absDegY < 90 && this._backOnTop) {
+            this._frontNode.setSiblingIndex(lastIdx);
+            this._backOnTop = false;
+        }
     }
 }
