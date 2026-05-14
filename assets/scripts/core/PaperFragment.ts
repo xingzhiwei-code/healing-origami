@@ -1,4 +1,6 @@
-import { _decorator, Component, Node, Sprite, Vec3 } from 'cc';
+import { _decorator, Component, Node, Sprite, tween, Tween, Vec3, v3 } from 'cc';
+
+import { DURATION_FOLD_SEC, easeFold } from '../utils/MotionEasing';
 
 const { ccclass, property } = _decorator;
 
@@ -18,10 +20,10 @@ const { ccclass, property } = _decorator;
  *       └── BackSprite    ← 背面图案，eulerAngles = (0, 180, 0) 与正面背靠背
  * ```
  *
- * 当前实现阶段：**M1-b 完成**
+ * 当前实现阶段：**M1-c 进行中**
  *  - M1-a：结构与 @property 注入点；
- *  - M1-b：`setFoldAngle(degY)` 驱动 `pivot.eulerAngles.y`，`_tmpEuler` 复用避免高频分配；
- *  - M1-c 起：`tween` 缓动、删调试入口、再接 M2 手势。
+ *  - M1-b：`setFoldAngle(degY)` 即时设置 `pivot.eulerAngles.y`；
+ *  - M1-c：`tweenFoldTo` 使用 `duration-fold` + `ease-fold`；M1-d 起接 Z 切换；M2 接手势。
  *
  * 关键纪律（呼应 `.cursorrules`）：
  *  - 折叠以 tween 作用于 `pivot.eulerAngles`，**严禁**直接旋转本节点；
@@ -66,6 +68,16 @@ export class PaperFragment extends Component {
     })
     public backSprite: Sprite | null = null;
 
+    /**
+     * 调试：进入场景后先将 pivot 设为 0°，再 tween 到 180° 一次。
+     *
+     * 接 `FoldController` 后应取消勾选，避免与手势冲突。
+     */
+    @property({
+        tooltip: '仅调试：运行时自动播放一次折叠 tween 至 180°（接入手势后请关闭）',
+    })
+    public debugAutoTweenFold180: boolean = false;
+
     // -------------------------------------------------------------------------
     // 内部缓存
     // -------------------------------------------------------------------------
@@ -102,6 +114,20 @@ export class PaperFragment extends Component {
         }
     }
 
+    protected start(): void {
+        if (!this.debugAutoTweenFold180 || !this.pivot) {
+            return;
+        }
+        this.setFoldAngle(0);
+        this.tweenFoldTo(180, DURATION_FOLD_SEC);
+    }
+
+    protected onDestroy(): void {
+        if (this.pivot?.isValid) {
+            Tween.stopAllByTarget(this.pivot);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // 对外 API
     // -------------------------------------------------------------------------
@@ -116,7 +142,25 @@ export class PaperFragment extends Component {
      */
     public setFoldAngle(degY: number): void {
         if (!this.pivot) return;
+        Tween.stopAllByTarget(this.pivot);
         this._tmpEuler.set(0, degY, 0);
         this.pivot.eulerAngles = this._tmpEuler;
+    }
+
+    /**
+     * 以 `duration-fold` 与 `ease-fold` 驱动 `pivot` 绕本地 Y 轴旋转到目标角。
+     *
+     * 重复调用会先 `stopAllByTarget(pivot)`，避免多条 tween 叠在同一节点上。
+     *
+     * @param degY 目标角度（°），通常 ∈ [0, 180]。
+     * @param durationSec 时长（秒）；默认 `DURATION_FOLD_SEC`，与 `specs/ui-design.md` 对齐。
+     */
+    public tweenFoldTo(degY: number, durationSec: number = DURATION_FOLD_SEC): void {
+        if (!this.pivot) return;
+        Tween.stopAllByTarget(this.pivot);
+        const end = v3(0, degY, 0);
+        tween(this.pivot)
+            .to(durationSec, { eulerAngles: end }, { easing: easeFold })
+            .start();
     }
 }
