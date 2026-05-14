@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Sprite } from 'cc';
+import { _decorator, Component, Node, Sprite, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -18,9 +18,10 @@ const { ccclass, property } = _decorator;
  *       └── BackSprite    ← 背面图案，eulerAngles = (0, 180, 0) 与正面背靠背
  * ```
  *
- * 当前实现阶段：**M1-a · 骨架**
- *  - 仅声明结构与 @property 注入点；
- *  - 不含折叠逻辑（M1-b 起逐步填充：先固定动画 → tween → Z 切换 → UV → 完整 API）。
+ * 当前实现阶段：**M1-b 完成**
+ *  - M1-a：结构与 @property 注入点；
+ *  - M1-b：`setFoldAngle(degY)` 驱动 `pivot.eulerAngles.y`，`_tmpEuler` 复用避免高频分配；
+ *  - M1-c 起：`tween` 缓动、删调试入口、再接 M2 手势。
  *
  * 关键纪律（呼应 `.cursorrules`）：
  *  - 折叠以 tween 作用于 `pivot.eulerAngles`，**严禁**直接旋转本节点；
@@ -66,6 +67,19 @@ export class PaperFragment extends Component {
     public backSprite: Sprite | null = null;
 
     // -------------------------------------------------------------------------
+    // 内部缓存
+    // -------------------------------------------------------------------------
+
+    /**
+     * 复用的欧拉角向量。
+     *
+     * 用途：避免 `setFoldAngle` 每次调用都 `new Vec3()`。
+     * 一关里折叠次数虽然有限，但同一份逻辑后续会被 `tween` / `update` 频繁调用（M1-c / M1-d），
+     * 这里预先按 `.cursorrules` 第三条「禁止高频分配」的约束写。
+     */
+    private readonly _tmpEuler: Vec3 = new Vec3();
+
+    // -------------------------------------------------------------------------
     // 生命周期
     // -------------------------------------------------------------------------
 
@@ -86,5 +100,23 @@ export class PaperFragment extends Component {
         if (!this.backSprite) {
             console.warn(`${tag} 缺少 backSprite 引用，请把 BackSprite 节点（含 Sprite 组件）拖入`);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // 对外 API
+    // -------------------------------------------------------------------------
+
+    /**
+     * 设置当前折叠角度（绕 Pivot 的 Y 轴）。
+     *
+     * @param degY 角度（°）。0 = 完全展开；180 = 完全折叠；中间值表示「折一半」。
+     *
+     * 仅作用于 `pivot.eulerAngles.y`，**不**直接旋转本组件所在节点。
+     * 设计依据：`specs/system-arch.md` §2.1。
+     */
+    public setFoldAngle(degY: number): void {
+        if (!this.pivot) return;
+        this._tmpEuler.set(0, degY, 0);
+        this.pivot.eulerAngles = this._tmpEuler;
     }
 }
