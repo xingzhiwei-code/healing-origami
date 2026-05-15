@@ -1,4 +1,4 @@
-import { _decorator, Component, Prefab, instantiate, Node, SpriteFrame, Texture2D, ImageAsset } from 'cc';
+import { _decorator, Component, Prefab, instantiate, Node, SpriteFrame, Texture2D } from 'cc';
 
 import { LevelRegistry } from '../data/LevelRegistry';
 import type { LevelConfig } from '../data/LevelConfig';
@@ -32,12 +32,6 @@ export class LevelRunner extends Component {
     })
     public fragmentPrefab: Prefab | null = null;
 
-    @property({
-        type: Texture2D,
-        tooltip: '测试贴图（M2 阶段所有片段共用）',
-    })
-    public debugTexture: Texture2D | null = null;
-
     /** 放置片段的父节点。 */
     @property({
         type: Node,
@@ -68,12 +62,12 @@ export class LevelRunner extends Component {
 
         const pw = config.paperSize.w;
         const ph = config.paperSize.h;
-        const sf = this.debugTexture?.image
-            ? SpriteFrame.createWithImage(this.debugTexture.image as ImageAsset)
-            : new SpriteFrame();
+
+        // 猫 demo：用 1x1 白色 SpriteFrame + Sprite.color 着色
+        const whiteSF = this._createWhiteSpriteFrame();
 
         for (const frag of config.fragments) {
-            const fragNode = this._instantiateFragment(frag, sf, pw, ph);
+            const fragNode = this._instantiateFragment(frag, whiteSF, pw, ph);
             this.paperRoot!.addChild(fragNode);
         }
 
@@ -83,6 +77,15 @@ export class LevelRunner extends Component {
             stars: 0,
             durationMs: 0,
         });
+    }
+
+    /** 创建 1x1 白色 SpriteFrame，用于纯色着色。 */
+    private _createWhiteSpriteFrame(): SpriteFrame {
+        const tex = new Texture2D();
+        tex.reset({ width: 1, height: 1 });
+        const sf = new SpriteFrame();
+        sf.texture = tex;
+        return sf;
     }
 
     private _instantiateFragment(config: FragmentConfig, sharedSF: SpriteFrame, pw: number, ph: number): Node {
@@ -111,7 +114,7 @@ export class LevelRunner extends Component {
         const centerY = (minY + maxY) * 0.5 - ph * 0.5;
         fragNode.setPosition(centerX, centerY, 0);
 
-        paperFrag.init(config, sharedSF, sharedSF);
+        paperFrag.init(config, sharedSF);
 
         return fragNode;
     }

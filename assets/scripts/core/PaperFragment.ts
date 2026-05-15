@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Sprite, SpriteFrame, tween, Tween, Vec3, v3 } from 'cc';
+import { _decorator, Color, Component, Node, Sprite, SpriteFrame, tween, Tween, Vec3, v3 } from 'cc';
 
 import { FragmentConfig } from '../data/FragmentConfig';
 import { DURATION_FOLD_SEC, easeFold } from '../utils/MotionEasing';
@@ -117,22 +117,29 @@ export class PaperFragment extends Component {
      * 初始化片段数据与贴图。
      *
      * @param config 片段配置（多边形、pivot、折叠顺序等）。
-     * @param frontSF 正面 SpriteFrame。
-     * @param backFullSF 背面 SpriteFrame（M2 阶段与 frontSF 相同，M3+ 阶段用完整图裁剪）。
+     * @param frontSF 正面 SpriteFrame（代码生成的纯色纹理）。
+     * @param backFullSF 背面 SpriteFrame（M2 阶段与 frontSF 相同，可选）。
      */
     public init(
         config: FragmentConfig,
         frontSF: SpriteFrame,
-        backFullSF: SpriteFrame,
+        backFullSF?: SpriteFrame,
     ): void {
         this._config = config;
-        this._applySpriteFrames(frontSF, backFullSF);
+        const back = backFullSF ?? frontSF;
+        this._applySpriteFrames(frontSF, back);
+        this._applyFragmentColor(config.frontColor);
     }
 
     private _applySpriteFrames(frontSF: SpriteFrame, backFullSF: SpriteFrame): void {
         if (!this.frontSprite || !this.backSprite) return;
         this.frontSprite.spriteFrame = frontSF;
         this.backSprite.spriteFrame = backFullSF;
+    }
+
+    private _applyFragmentColor(hexColor: string): void {
+        if (!this.frontSprite) return;
+        this.frontSprite.color = Color.fromHEX(new Color(), hexColor);
     }
 
     /**

@@ -1,9 +1,9 @@
-import { Vec2, Vec3 } from 'cc';
+import { Vec2 } from 'cc';
 
 /**
  * 折叠轴方向。
  *
- * 定义片段绕哪条边折叠，影响 pivot 朝向与背面 UV 镜像轴。
+ * 定义片段绕哪条边折叠。
  */
 export type FoldAxis = 'left' | 'right' | 'top' | 'bottom' | 'diagonal';
 
@@ -26,6 +26,12 @@ export interface RectUV {
 export interface FragmentConfig {
     /** 片段唯一标识，用于事件派发与日志。 */
     readonly id: string;
+
+    /** 片段显示名称，用于 UI 展示（如「耳朵」「身体」）。 */
+    readonly displayName: string;
+
+    /** 片段正面颜色（HEX），用于代码生成纹理时着色。 */
+    readonly frontColor: string;
 
     /** 片段多边形顶点（FragmentRoot 本地坐标系）。 */
     readonly polyPoints: readonly Vec2[];
